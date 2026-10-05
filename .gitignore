@@ -1,0 +1,15 @@
+/.gradle/
+/build/
+/run/
+/.idea/
+*.iml
+__pycache__/
+*.pyc
+.DS_Store
+/mcopt/
+/logs/
+/.codex/
+/.agents/
+/.aws/
+.env
+.env.*

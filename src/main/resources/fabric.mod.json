@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "metalmc",
+  "version": "${version}",
+  "name": "MetalMC (Native Foundation)",
+  "description": "Experimental native Metal foundation for Minecraft 26.3. Currently an opt-in offscreen GPU diagnostic; the game backend is not replaced yet.",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.metalmc.MetalMCClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "26.3",
+    "java": ">=25"
+  }
+}

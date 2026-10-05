@@ -1,0 +1,86 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.17.4'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+tasks.named('wrapper', Wrapper) {
+    gradleVersion = '9.6.0'
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    compileOnly 'org.lwjgl:lwjgl:3.4.3'
+    compileOnly 'org.lwjgl:lwjgl-spvc:3.4.3'
+    testImplementation 'org.lwjgl:lwjgl:3.4.3'
+    testImplementation 'org.lwjgl:lwjgl-sdl:3.4.3'
+    testImplementation 'org.lwjgl:lwjgl-spvc:3.4.3'
+    testImplementation 'org.lwjgl:lwjgl-shaderc:3.4.3'
+    testRuntimeOnly 'org.lwjgl:lwjgl:3.4.3:natives-macos-arm64'
+    testRuntimeOnly 'org.lwjgl:lwjgl-sdl:3.4.3:natives-macos-arm64'
+    testRuntimeOnly 'org.lwjgl:lwjgl-spvc:3.4.3:natives-macos-arm64'
+    testRuntimeOnly 'org.lwjgl:lwjgl-shaderc:3.4.3:natives-macos-arm64'
+    testRuntimeOnly 'it.unimi.dsi:fastutil:8.5.18'
+    // Real vanilla vertex layouts initialize Mth/Util, beyond the backend API.
+    testRuntimeOnly 'com.google.guava:guava:33.6.0-jre'
+    testRuntimeOnly 'com.mojang:datafixerupper:10.0.21'
+    testRuntimeOnly 'com.mojang:logging:1.7.12'
+    testRuntimeOnly 'org.apache.commons:commons-lang3:3.20.0'
+    // LWJGL auto-selects jemalloc when the game's Java binding is present.
+    testRuntimeOnly 'org.lwjgl:lwjgl-jemalloc:3.4.3'
+    testRuntimeOnly 'org.lwjgl:lwjgl-jemalloc:3.4.3:natives-macos-arm64'
+    testRuntimeOnly 'com.mojang:jtracy:1.14.38:natives-macos-arm64'
+    // No Fabric API callbacks are required for the initial client diagnostic.
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+tasks.named('compileJava', JavaCompile) {
+    options.headerOutputDirectory = file('build/native/headers')
+}
+
+tasks.register('compileNative', Exec) {
+    dependsOn tasks.named('compileJava')
+    inputs.files(fileTree('src/main/native'), file('tools/build_native.sh'))
+    outputs.file('build/generated-resources/natives/macos-arm64/libmetalmc.dylib')
+    environment 'JAVA_HOME', System.getProperty('java.home')
+    commandLine 'bash', 'tools/build_native.sh'
+}
+
+sourceSets.main.resources.srcDir('build/generated-resources')
+tasks.named('processResources') {
+    dependsOn tasks.named('compileNative')
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand version: project.version }
+}
+
+tasks.register('nativeSmoke', JavaExec) {
+    dependsOn tasks.named('testClasses'), tasks.named('processResources')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.metalmc.metal.NativeSmokeTest'
+    environment 'MTL_DEBUG_LAYER', '1'
+    jvmArgs '--enable-native-access=ALL-UNNAMED', '-Xcheck:jni'
+    args file('build/reports/metal-triangle.png').absolutePath
+}
+tasks.named('check') { dependsOn tasks.named('nativeSmoke') }
+
+// A graphical test is deliberately separate from the offscreen build/check.
+tasks.register('presentationTest', JavaExec) {
+    dependsOn tasks.named('testClasses'), tasks.named('processResources')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.metalmc.metal.SDLPresentationTest'
+    environment 'MTL_DEBUG_LAYER', '1'
+    jvmArgs '-XstartOnFirstThread', '--enable-native-access=ALL-UNNAMED', '-Xcheck:jni'
+    args '18', 'true'
+}
